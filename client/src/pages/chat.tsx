@@ -42,10 +42,8 @@ export default function Chat() {
   // Send message mutation
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
-      return apiRequest("/api/messages", {
-        method: "POST",
-        body: { role: "user", content },
-      });
+      const res = await apiRequest("POST", "/api/messages", { role: "user", content });
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
@@ -62,9 +60,8 @@ export default function Chat() {
   // Clear messages mutation
   const clearMessagesMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("/api/messages", {
-        method: "DELETE",
-      });
+      const res = await apiRequest("DELETE", "/api/messages");
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/messages"] });

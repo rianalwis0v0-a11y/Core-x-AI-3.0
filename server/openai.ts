@@ -1,19 +1,28 @@
 import OpenAI from "openai";
 
-// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-const openai = new OpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY 
-});
-
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
+}
+
+// Lazy initialization - only create client when needed
+function getOpenAIClient() {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error("OpenAI API key is not set. Please add your OPENAI_API_KEY in the Secrets tab to enable AI responses.");
+  }
+  
+  // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+  return new OpenAI({ 
+    apiKey: process.env.OPENAI_API_KEY 
+  });
 }
 
 export async function getChatCompletion(
   messages: ChatMessage[]
 ): Promise<string> {
   try {
+    const openai = getOpenAIClient();
+    
     const response = await openai.chat.completions.create({
       model: "gpt-5",
       messages: messages,
@@ -23,7 +32,10 @@ export async function getChatCompletion(
     return response.choices[0].message.content || "I apologize, but I couldn't generate a response.";
   } catch (error: any) {
     if (error?.status === 401) {
-      throw new Error("OpenAI API key is invalid or missing. Please add your API key in the Secrets tab.");
+      throw new Error("OpenAI API key is invalid. Please check your API key in the Secrets tab.");
+    }
+    if (error.message?.includes("not set")) {
+      throw error;
     }
     throw new Error(`OpenAI API error: ${error.message}`);
   }
