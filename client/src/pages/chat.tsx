@@ -5,7 +5,8 @@ import TypingIndicator from "@/components/TypingIndicator";
 import EmptyState from "@/components/EmptyState";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
+import logoUrl from "@assets/file_00000000d59861faa5d2b201fab77f3a (1)_1761396857368.png";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -72,9 +73,9 @@ export default function Chat() {
       <header className="border-b bg-background shrink-0">
         <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
+            <img src={logoUrl} alt="Core X AI" className="h-7 w-7" />
             <h1 className="text-lg font-semibold" data-testid="text-app-title">
-              AI Assistant
+              Core X AI v3.0
             </h1>
           </div>
           <div className="flex items-center gap-2">
