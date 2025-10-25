@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import ChatMessage from "@/components/ChatMessage";
 import ChatInput from "@/components/ChatInput";
 import TypingIndicator from "@/components/TypingIndicator";
@@ -18,6 +20,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 interface Message {
   id: string;
@@ -27,10 +30,50 @@ interface Message {
 }
 
 export default function Chat() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+
+  // Fetch messages
+  const { data: messages = [], isLoading } = useQuery<Message[]>({
+    queryKey: ["/api/messages"],
+  });
+
+  // Send message mutation
+  const sendMessageMutation = useMutation({
+    mutationFn: async (content: string) => {
+      return apiRequest("/api/messages", {
+        method: "POST",
+        body: { role: "user", content },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send message. Please check if your API key is set.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Clear messages mutation
+  const clearMessagesMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("/api/messages", {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
+      toast({
+        title: "Conversation cleared",
+        description: "All messages have been deleted.",
+      });
+    },
+  });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -38,34 +81,14 @@ export default function Chat() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isTyping]);
+  }, [messages, sendMessageMutation.isPending]);
 
   const handleSend = async (content: string) => {
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: "user",
-      content,
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
-    setIsTyping(true);
-
-    // TODO: Remove mock functionality - Replace with actual API call
-    setTimeout(() => {
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: `Thank you for your message: "${content}"\n\nThis is a demo response. In the full application, I'll be powered by OpenAI's GPT models to provide intelligent, context-aware responses.\n\nI can help you with:\n- Answering questions\n- Explaining complex concepts\n- Writing and debugging code\n- Creative brainstorming\n- And much more!\n\nHere's a code example:\n\`\`\`javascript\nconst greet = (name) => {\n  console.log(\`Hello, \${name}!\`);\n};\n\ngreet("World");\n\`\`\``,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, aiMessage]);
-      setIsTyping(false);
-    }, 1500);
+    await sendMessageMutation.mutateAsync(content);
   };
 
   const handleClearChat = () => {
-    setMessages([]);
+    clearMessagesMutation.mutate();
   };
 
   return (
@@ -108,7 +131,7 @@ export default function Chat() {
       </header>
 
       <main className="flex-1 overflow-hidden">
-        {messages.length === 0 && !isTyping ? (
+        {messages.length === 0 && !sendMessageMutation.isPending && !isLoading ? (
           <EmptyState onSuggestedPrompt={handleSend} />
         ) : (
           <div
@@ -121,10 +144,10 @@ export default function Chat() {
                   key={message.id}
                   role={message.role}
                   content={message.content}
-                  timestamp={message.timestamp}
+                  timestamp={new Date(message.timestamp)}
                 />
               ))}
-              {isTyping && <TypingIndicator />}
+              {sendMessageMutation.isPending && <TypingIndicator />}
               <div ref={messagesEndRef} />
             </div>
           </div>
@@ -133,7 +156,7 @@ export default function Chat() {
 
       <ChatInput
         onSend={handleSend}
-        disabled={isTyping}
+        disabled={sendMessageMutation.isPending}
         placeholder={messages.length === 0 ? "Ask me anything..." : "Type your message..."}
       />
     </div>
