@@ -1,12 +1,32 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { getChatCompletion } from "./openai";
 import { insertMessageSchema } from "@shared/schema";
 
+// Authentication middleware
+function requireAuth(req: Request, res: Response, next: NextFunction) {
+  const userId = req.headers['x-replit-user-id'];
+  const userName = req.headers['x-replit-user-name'];
+  
+  if (!userId || !userName) {
+    return res.status(401).json({ 
+      error: "Authentication required. Please log in with your Replit account." 
+    });
+  }
+  
+  // Attach user info to request for later use
+  (req as any).user = {
+    id: userId,
+    name: userName
+  };
+  
+  next();
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Get all messages
-  app.get("/api/messages", async (_req, res) => {
+  // Get all messages (requires authentication)
+  app.get("/api/messages", requireAuth, async (_req, res) => {
     try {
       const messages = await storage.getMessages();
       res.json(messages);
@@ -15,8 +35,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Send a message and get AI response
-  app.post("/api/messages", async (req, res) => {
+  // Send a message and get AI response (requires authentication)
+  app.post("/api/messages", requireAuth, async (req, res) => {
     try {
       const validated = insertMessageSchema.parse(req.body);
       
@@ -58,14 +78,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Clear all messages
-  app.delete("/api/messages", async (_req, res) => {
+  // Clear all messages (requires authentication)
+  app.delete("/api/messages", requireAuth, async (_req, res) => {
     try {
       await storage.clearMessages();
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
+  });
+
+  // Get current user info
+  app.get("/api/user", async (req, res) => {
+    const userId = req.headers['x-replit-user-id'];
+    const userName = req.headers['x-replit-user-name'];
+    
+    if (!userId || !userName) {
+      return res.json({ authenticated: false });
+    }
+    
+    res.json({
+      authenticated: true,
+      id: userId,
+      name: userName
+    });
   });
 
   const httpServer = createServer(app);

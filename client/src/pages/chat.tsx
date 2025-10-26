@@ -7,8 +7,9 @@ import TypingIndicator from "@/components/TypingIndicator";
 import EmptyState from "@/components/EmptyState";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
-import { Trash2 } from "lucide-react";
+import { Trash2, LogIn } from "lucide-react";
 import logoUrl from "@assets/file_00000000d59861faa5d2b201fab77f3a (1)_1761396857368.png";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,14 +30,26 @@ interface Message {
   timestamp: Date;
 }
 
+interface User {
+  authenticated: boolean;
+  id?: string;
+  name?: string;
+}
+
 export default function Chat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
+  // Check if user is authenticated
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/user"],
+  });
+
   // Fetch messages
   const { data: messages = [], isLoading } = useQuery<Message[]>({
     queryKey: ["/api/messages"],
+    enabled: user?.authenticated === true,
   });
 
   // Send message mutation
@@ -88,6 +101,74 @@ export default function Chat() {
     clearMessagesMutation.mutate();
   };
 
+  const handleLogin = () => {
+    window.addEventListener("message", authComplete);
+    const h = 500;
+    const w = 350;
+    const left = screen.width / 2 - w / 2;
+    const top = screen.height / 2 - h / 2;
+
+    const authWindow = window.open(
+      "https://replit.com/auth_with_repl_site?domain=" + location.host,
+      "_blank",
+      "modal=yes, toolbar=no, location=no, directories=no, status=no, menubar=no, scrollbars=no, resizable=no, copyhistory=no, width=" +
+        w +
+        ", height=" +
+        h +
+        ", top=" +
+        top +
+        ", left=" +
+        left
+    );
+
+    function authComplete(e: MessageEvent) {
+      if (e.data !== "auth_complete") {
+        return;
+      }
+
+      window.removeEventListener("message", authComplete);
+      authWindow?.close();
+      location.reload();
+    }
+  };
+
+  // Show login page if not authenticated
+  if (!user?.authenticated) {
+    return (
+      <div className="flex flex-col h-screen">
+        <header className="border-b bg-background shrink-0">
+          <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <img src={logoUrl} alt="Core X AI" className="h-7 w-7" />
+              <h1 className="text-lg font-semibold">Core X AI v3.0</h1>
+            </div>
+            <ThemeToggle />
+          </div>
+        </header>
+
+        <main className="flex-1 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader className="text-center">
+              <div className="flex justify-center mb-4">
+                <img src={logoUrl} alt="Core X AI" className="h-16 w-16" />
+              </div>
+              <CardTitle className="text-2xl">Welcome to Core X AI v3.0</CardTitle>
+              <CardDescription>
+                Sign in with your Replit account to start chatting with our AI assistant
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button onClick={handleLogin} className="w-full" size="lg">
+                <LogIn className="mr-2 h-5 w-5" />
+                Log in with Replit
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen">
       <header className="border-b bg-background shrink-0">
@@ -99,6 +180,9 @@ export default function Chat() {
             </h1>
           </div>
           <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground hidden sm:inline">
+              {user?.name}
+            </span>
             {messages.length > 0 && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
