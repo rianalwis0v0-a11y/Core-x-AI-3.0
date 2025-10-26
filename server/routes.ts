@@ -3,28 +3,93 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { getChatCompletion } from "./openai";
 import { insertMessageSchema } from "@shared/schema";
+import { registerUser, loginUser, verifySession, logout } from "./auth";
+import cookieParser from "cookie-parser";
 
 // Authentication middleware
-function requireAuth(req: Request, res: Response, next: NextFunction) {
-  const userId = req.headers['x-replit-user-id'];
-  const userName = req.headers['x-replit-user-name'];
+async function requireAuth(req: Request, res: Response, next: NextFunction) {
+  const token = req.cookies.coreXToken;
   
-  if (!userId || !userName) {
+  if (!token) {
     return res.status(401).json({ 
-      error: "Authentication required. Please log in with your Replit account." 
+      error: "Authentication required. Please log in with your Core X account." 
     });
   }
   
-  // Attach user info to request for later use
-  (req as any).user = {
-    id: userId,
-    name: userName
-  };
+  const user = await verifySession(token);
+  if (!user) {
+    return res.status(401).json({ 
+      error: "Invalid or expired session. Please log in again." 
+    });
+  }
   
+  (req as any).user = user;
   next();
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  app.use(cookieParser());
+  
+  // Register new user
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const { username, email, password } = req.body;
+      
+      if (!username || !email || !password) {
+        return res.status(400).json({ error: "All fields are required" });
+      }
+      
+      if (password.length < 8) {
+        return res.status(400).json({ error: "Password must be at least 8 characters" });
+      }
+      
+      await registerUser(username, email, password);
+      res.json({ success: true, message: "Account created successfully" });
+    } catch (error: any) {
+      if (error.message?.includes("UNIQUE")) {
+        return res.status(400).json({ error: "Username or email already exists" });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Login
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { usernameOrEmail, password } = req.body;
+      
+      if (!usernameOrEmail || !password) {
+        return res.status(400).json({ error: "All fields are required" });
+      }
+      
+      const session = await loginUser(usernameOrEmail, password);
+      
+      res.cookie("coreXToken", session.token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        sameSite: "lax",
+      });
+      
+      res.json({ 
+        success: true, 
+        user: { id: session.userId, username: session.username }
+      });
+    } catch (error: any) {
+      res.status(401).json({ error: error.message });
+    }
+  });
+  
+  // Logout
+  app.post("/api/auth/logout", async (req, res) => {
+    const token = req.cookies.coreXToken;
+    if (token) {
+      await logout(token);
+    }
+    res.clearCookie("coreXToken");
+    res.json({ success: true });
+  });
+  
   // Get all messages (requires authentication)
   app.get("/api/messages", requireAuth, async (_req, res) => {
     try {
@@ -90,17 +155,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Get current user info
   app.get("/api/user", async (req, res) => {
-    const userId = req.headers['x-replit-user-id'];
-    const userName = req.headers['x-replit-user-name'];
+    const token = req.cookies.coreXToken;
     
-    if (!userId || !userName) {
+    if (!token) {
+      return res.json({ authenticated: false });
+    }
+    
+    const user = await verifySession(token);
+    if (!user) {
       return res.json({ authenticated: false });
     }
     
     res.json({
       authenticated: true,
-      id: userId,
-      name: userName
+      id: user.userId,
+      name: user.username
     });
   });
 

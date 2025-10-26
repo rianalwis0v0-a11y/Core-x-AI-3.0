@@ -1,5 +1,9 @@
 import { type Message, type InsertMessage } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import Database from "better-sqlite3";
+import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { users, sessions } from "./db/schema";
 
 export interface IStorage {
   // Messages
@@ -36,5 +40,15 @@ export class MemStorage implements IStorage {
     this.messages.clear();
   }
 }
+
+const sqlite = new Database("sqlite.db");
+export const db = drizzle(sqlite);
+
+const messages = sqliteTable("messages", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  role: text("role").notNull(),
+  content: text("content").notNull(),
+  timestamp: integer("timestamp", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
 
 export const storage = new MemStorage();
