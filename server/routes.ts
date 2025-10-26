@@ -34,7 +34,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const messagesForAI = [
         {
           role: "system" as const,
-          content: "You are Core X AI v3.0, an intelligent assistant powered by deep learning and machine learning. You help users with questions, coding, problem-solving, and creative tasks. Be helpful, clear, and concise.",
+          content: "You are Core X AI v3.0, an intelligent assistant running on Ollama with Llama 3.2. You help users with questions, coding, problem-solving, and creative tasks. Be helpful, clear, and concise.",
         },
         ...conversationHistory,
       ];

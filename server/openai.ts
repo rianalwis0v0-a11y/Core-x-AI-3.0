@@ -1,42 +1,43 @@
-import OpenAI from "openai";
 
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
 }
 
-// Lazy initialization - only create client when needed
-function getOpenAIClient() {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error("OpenAI API key is not set. Please add your OPENAI_API_KEY in the Secrets tab to enable AI responses.");
-  }
+async function getOllamaCompletion(
+  messages: ChatMessage[]
+): Promise<string> {
+  const ollamaUrl = "http://127.0.0.1:11434";
   
-  // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-  return new OpenAI({ 
-    apiKey: process.env.OPENAI_API_KEY 
-  });
+  try {
+    const response = await fetch(`${ollamaUrl}/api/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "llama3.2:3b",
+        messages: messages,
+        stream: false,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Ollama API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.message.content || "I apologize, but I couldn't generate a response.";
+  } catch (error: any) {
+    if (error.message?.includes("ECONNREFUSED") || error.code === "ECONNREFUSED") {
+      throw new Error("Ollama is not running. Start it using the 'Start Ollama' workflow from the dropdown menu.");
+    }
+    throw new Error(`Ollama error: ${error.message}`);
+  }
 }
 
 export async function getChatCompletion(
   messages: ChatMessage[]
 ): Promise<string> {
-  try {
-    const openai = getOpenAIClient();
-    
-    const response = await openai.chat.completions.create({
-      model: "gpt-5",
-      messages: messages,
-      max_completion_tokens: 8192,
-    });
-
-    return response.choices[0].message.content || "I apologize, but I couldn't generate a response.";
-  } catch (error: any) {
-    if (error?.status === 401) {
-      throw new Error("OpenAI API key is invalid. Please check your API key in the Secrets tab.");
-    }
-    if (error.message?.includes("not set")) {
-      throw error;
-    }
-    throw new Error(`OpenAI API error: ${error.message}`);
-  }
+  return getOllamaCompletion(messages);
 }

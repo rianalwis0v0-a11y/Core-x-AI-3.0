@@ -42,5 +42,23 @@ task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
 
+[[workflows.workflow]]
+name = "Start Ollama"
+author = 47808259
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "ollama serve"
+
+[[workflows.workflow]]
+name = "Download Llama Model"
+author = 47808259
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "ollama pull llama3.2:3b"
+
 [agent]
 integrations = ["javascript_mem_db:1.0.0", "javascript_openai:1.0.0"]
