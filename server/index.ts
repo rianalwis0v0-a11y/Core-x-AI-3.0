@@ -78,4 +78,23 @@ app.use((req, res, next) => {
   }, () => {
     log(`serving on port ${port}`);
   });
-})();
+})(); 
+import express from 'express';
+import { getAIResponse, addTrainingExample } from './ai';
+
+const app = express();
+app.use(express.json());
+
+app.post('/chat', (req, res) => {
+  const { message } = req.body;
+  const response = getAIResponse(message);
+  res.json({ response });
+});
+
+app.post('/train', (req, res) => {
+  const { input, output } = req.body;
+  addTrainingExample(input, output);
+  res.json({ status: 'Training data added!' });
+});
+
+app.listen(3000, () => console.log('Server running on http://localhost:3000'));
